@@ -1,3 +1,4 @@
+// [FRONTEND · React] src/store/authStore.ts   (YOUR EXISTING FILE: only the console.log that printed the login response was removed)
 // store/authStore.ts — global auth state. Replaces AuthContext.tsx.
 //
 // Unlike Context, this is a plain module — readable and writable from
@@ -50,7 +51,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (payload) => {
     const res = await authApi.login(payload);
-    console.log("response from login in store: ",res);
     set({ user: res.user, accessToken: res.accessToken, status: 'authenticated' });
   },
 

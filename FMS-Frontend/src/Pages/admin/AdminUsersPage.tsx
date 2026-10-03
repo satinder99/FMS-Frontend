@@ -1,27 +1,38 @@
+// [FRONTEND · React] src/pages/admin/AdminUsersPage.tsx
 import { useState } from 'react';
 import AssignRoleForm from '../../components/admin/AssignRoleForm';
-import { isPendingUser, useAdminStore } from '../../store/adminStore';
-import { ROLE_NAMES } from '../../types/roles';
+import AsyncState from '../../components/common/AsyncState';
+import { useApiData } from '../../hooks/useApiData';
+import { adminApi } from '../../lib/fleetApi';
+import { isAssigned } from '../../lib/roles';
+import { ROLE_NAMES, type RoleName } from '../../types/roles';
 
 export default function AdminUsersPage() {
-  const users = useAdminStore((s) => s.users);
-  const orgs = useAdminStore((s) => s.orgs);
+  const usersQ = useApiData(adminApi.listUsers, 30_000);
+  const orgsQ = useApiData(adminApi.listOrganizations);
 
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const users = usersQ.data ?? [];
+  const orgs = orgsQ.data ?? [];
+
   const q = query.trim().toLowerCase();
   const filtered = users.filter((u) => {
     const matchesText =
-      !q ||
-      `${u.first_name} ${u.last_name} ${u.email} ${u.username ?? ''}`.toLowerCase().includes(q);
-    const matchesRole =
-      !roleFilter || (roleFilter === 'none' ? isPendingUser(u) : u.role_name === roleFilter);
+      !q || `${u.first_name} ${u.last_name} ${u.email} ${u.username ?? ''}`.toLowerCase().includes(q);
+    const matchesRole = !roleFilter || (roleFilter === 'none' ? !isAssigned(u) : u.role_name === roleFilter);
     return matchesText && matchesRole;
   });
 
-  const orgName = (id: number | null) => (id == null ? '—' : (orgs.find((o) => o.id === id)?.short_name ?? `#${id}`));
+  const orgName = (id: number | null) =>
+    id == null ? '—' : (orgs.find((o) => o.id === id)?.short_name ?? `#${id}`);
+
+  async function handleAssign(userId: number, role: RoleName, orgId: number | null) {
+    await adminApi.assignAccess(userId, role, orgId);
+    await usersQ.reload();
+  }
 
   return (
     <div className="space-y-6">
@@ -52,59 +63,81 @@ export default function AdminUsersPage() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
-            <tr>
-              <th scope="col" className="px-4 py-3 font-medium">Name</th>
-              <th scope="col" className="px-4 py-3 font-medium">Username</th>
-              <th scope="col" className="px-4 py-3 font-medium">Role</th>
-              <th scope="col" className="px-4 py-3 font-medium">Org</th>
-              <th scope="col" className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.length === 0 && (
+      <AsyncState
+        loading={usersQ.loading || orgsQ.loading}
+        error={usersQ.error ?? orgsQ.error}
+        hasData={!!usersQ.data && !!orgsQ.data}
+        onRetry={() => {
+          void usersQ.reload();
+          void orgsQ.reload();
+        }}
+      >
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                  No users match those filters.
-                </td>
+                <th scope="col" className="px-4 py-3 font-medium">Name</th>
+                <th scope="col" className="px-4 py-3 font-medium">Username</th>
+                <th scope="col" className="px-4 py-3 font-medium">Role</th>
+                <th scope="col" className="px-4 py-3 font-medium">Org</th>
+                <th scope="col" className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
               </tr>
-            )}
-            {filtered.map((u) => (
-              <tr key={u.id} className="align-top">
-                <td className="px-4 py-3">
-                  <p className="font-medium">{u.first_name} {u.last_name}</p>
-                  <p className="text-slate-500">{u.email}</p>
-                </td>
-                <td className="px-4 py-3 text-slate-600">{u.username ?? <span className="text-slate-400">not generated</span>}</td>
-                <td className="px-4 py-3">
-                  {u.role_name ?? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">unassigned</span>}
-                </td>
-                <td className="px-4 py-3">{orgName(u.org_id)}</td>
-                <td className="px-4 py-3 text-right">
-                  {editingId === u.id ? (
-                    <div className="flex flex-col items-end gap-2">
-                      <AssignRoleForm user={u} submitLabel="Save changes" onDone={() => setEditingId(null)} />
-                      <button type="button" onClick={() => setEditingId(null)} className="text-slate-600 underline">
-                        Cancel
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                    No users match those filters.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((u) => (
+                <tr key={u.id} className="align-top">
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{u.first_name} {u.last_name}</p>
+                    <p className="text-slate-500">{u.email}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {u.username ?? <span className="text-slate-400">not generated</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.role_name ?? (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                        unassigned
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">{orgName(u.org_id)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {editingId === u.id ? (
+                      <div className="flex flex-col items-end gap-2">
+                        <AssignRoleForm
+                          user={u}
+                          orgs={orgs}
+                          submitLabel="Save changes"
+                          onAssign={handleAssign}
+                          onDone={() => setEditingId(null)}
+                        />
+                        <button type="button" onClick={() => setEditingId(null)} className="text-slate-600 underline">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(u.id)}
+                        className="rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        Edit access
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(u.id)}
-                      className="rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-                    >
-                      Edit access
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </AsyncState>
     </div>
   );
 }

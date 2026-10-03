@@ -1,33 +1,43 @@
+// [FRONTEND · React] src/components/admin/AssignRoleForm.tsx
 import { useState } from 'react';
-import { isPendingUser, useAdminStore } from '../../store/adminStore';
-import type { AdminUser } from '../../types/admin';
+import { errorMessage } from '../../lib/fleetApi';
+import { isAssigned } from '../../lib/roles';
+import type { AdminUser, Organization } from '../../types/admin';
 import { ROLE_NAMES, type RoleName } from '../../types/roles';
 
 interface Props {
   user: AdminUser;
+  orgs: Organization[];
   submitLabel: string;
+  /** Should call the API and refresh the lists; throw on failure. */
+  onAssign: (userId: number, role: RoleName, orgId: number | null) => Promise<void>;
   onDone?: () => void;
 }
 
 const selectClass =
   'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:bg-slate-100 disabled:text-slate-400';
 
-export default function AssignRoleForm({ user, submitLabel, onDone }: Props) {
-  const orgs = useAdminStore((s) => s.orgs);
-  const assign = useAdminStore((s) => s.assignOrgAndRole);
-
+export default function AssignRoleForm({ user, orgs, submitLabel, onAssign, onDone }: Props) {
   const [role, setRole] = useState<RoleName | ''>(user.role_name ?? '');
   const [orgId, setOrgId] = useState<number | ''>(user.org_id ?? (orgs.length === 1 ? orgs[0].id : ''));
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const isAdminRole = role === 'admin';
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!role) return setError('Choose a role.');
-    const result = assign(user.id, role, isAdminRole ? null : orgId === '' ? null : orgId);
-    if (!result.ok) return setError(result.error);
+    if (!isAdminRole && orgId === '') return setError('Choose an organization.');
+    setSaving(true);
     setError(null);
-    onDone?.();
+    try {
+      await onAssign(user.id, role, isAdminRole || orgId === '' ? null : orgId);
+      onDone?.();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -65,14 +75,15 @@ export default function AssignRoleForm({ user, submitLabel, onDone }: Props) {
 
         <button
           type="button"
-          onClick={handleSubmit}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+          onClick={() => void handleSubmit()}
+          disabled={saving}
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
         >
-          {submitLabel}
+          {saving ? 'Saving…' : submitLabel}
         </button>
       </div>
       {error && <p role="alert" className="mt-1 text-sm text-red-700">{error}</p>}
-      {!isPendingUser(user) && (
+      {isAssigned(user) && (
         <p className="mt-1 text-xs text-slate-500">
           Changing access signs this user out everywhere so the new role takes effect.
         </p>

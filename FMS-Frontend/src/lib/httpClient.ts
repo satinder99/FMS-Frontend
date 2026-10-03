@@ -1,3 +1,4 @@
+// [FRONTEND · React] src/lib/httpClient.ts   (YOUR EXISTING FILE: only the header merge inside request() changed)
 // lib/httpClient.ts — the base fetch wrapper. Deliberately has NO
 // dependency on the auth store — this is what authApi.ts (and by
 // extension authStore.ts) is built on, so it can't import the store
@@ -19,13 +20,18 @@ export class ApiError extends Error {
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Headers are merged AFTER the rest of the options are spread. Before, `...options` came last, so any
+  // caller that passed its own `headers` (apiClient always adds Authorization) replaced the whole headers
+  // object and silently dropped `Content-Type: application/json`. Express then ignores the body and the
+  // route sees `req.body === undefined`.
+  const { headers, ...rest } = options;
+  const mergedHeaders = new Headers({ 'Content-Type': 'application/json' });
+  new Headers(headers).forEach((value, key) => mergedHeaders.set(key, value)); // caller's headers win
+
   const res = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include', // send/receive the httpOnly refresh cookie
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-    ...options,
+    ...rest,
+    headers: mergedHeaders,
   });
 
   if (res.status === 204) {

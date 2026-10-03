@@ -1,39 +1,4 @@
-// // App.tsx
-
-// import { useEffect } from 'react';
-// import { Routes, Route, Navigate } from 'react-router';
-// import { SignUpPage } from './pages/SignUpPage';
-// import { LoginPage } from './pages/LoginPage';
-// import { PendingAssignmentPage } from './pages/PendingAssignmentPage';
-// import { useAuthStore } from './store/authStore';
-
-// export function App() {
-//   const status = useAuthStore((s) => s.status);
-//   const bootstrap = useAuthStore((s) => s.bootstrap);
-
-//   useEffect(() => {
-//     bootstrap();
-//   }, [bootstrap]);
-
-//   if (status === 'checking') {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-//         <p className="text-sm text-gray-400">Loading…</p>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <Routes>
-//       <Route path="/signup" element={<SignUpPage />} />
-//       <Route path="/login" element={<LoginPage />} />
-//       <Route path="/pending-assignment" element={<PendingAssignmentPage />} />
-//       <Route path="/" element={<Navigate to={status === 'authenticated' ? '/pending-assignment' : '/login'} replace />} />
-//     </Routes>
-//   );
-// }
-
-
+// [FRONTEND · React] src/App.tsx
 import { useEffect } from 'react';
 import { Route, Routes } from 'react-router';
 
@@ -44,15 +9,19 @@ import RequireAuth from './components/routing/RequireAuth';
 import RequireRole from './components/routing/RequireRole';
 import RootRedirect from './components/routing/RootRedirect';
 
-import {LoginPage} from './pages/LoginPage';
-import {PendingAssignmentPage} from './pages/PendingAssignmentPage';
-import {SignUpPage} from './pages/SignUpPage';
+import { LoginPage } from './pages/LoginPage';
+import { PendingAssignmentPage } from './pages/PendingAssignmentPage';
+import { SignUpPage } from './pages/SignUpPage';
 
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminNewOrganizationPage from './pages/admin/AdminNewOrganizationPage';
 import AdminPendingUsersPage from './pages/admin/AdminPendingUsersPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import DispatcherDashboardPage from './pages/dispatcher/DispatcherDashboardPage';
 import DispatcherDriverPage from './pages/dispatcher/DispatcherDriverPage';
+import DriverPayRatesPage from './pages/dispatcher/DriverPayRatesPage';
+import EquipmentPage from './pages/dispatcher/EquipmentPage';
+import NewTripPage from './pages/dispatcher/NewTripPage';
 import DriverDashboardPage from './pages/driver/DriverDashboardPage';
 import DriverHoursPage from './pages/driver/DriverHoursPage';
 
@@ -79,6 +48,7 @@ export default function App() {
         <Route element={<RequireRole allowed={['admin']} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
+            <Route path="organizations/new" element={<AdminNewOrganizationPage />} />
             <Route path="pending" element={<AdminPendingUsersPage />} />
             <Route path="users" element={<AdminUsersPage />} />
           </Route>
@@ -88,6 +58,9 @@ export default function App() {
           <Route path="/dispatcher" element={<DispatcherLayout />}>
             <Route index element={<DispatcherDashboardPage />} />
             <Route path="drivers/:driverId" element={<DispatcherDriverPage />} />
+            <Route path="drivers/:driverId/pay" element={<DriverPayRatesPage />} />
+            <Route path="trips/new" element={<NewTripPage />} />
+            <Route path="equipment" element={<EquipmentPage />} />
           </Route>
         </Route>
 
