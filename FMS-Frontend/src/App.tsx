@@ -1,34 +1,106 @@
-// App.tsx
+// // App.tsx
+
+// import { useEffect } from 'react';
+// import { Routes, Route, Navigate } from 'react-router';
+// import { SignUpPage } from './pages/SignUpPage';
+// import { LoginPage } from './pages/LoginPage';
+// import { PendingAssignmentPage } from './pages/PendingAssignmentPage';
+// import { useAuthStore } from './store/authStore';
+
+// export function App() {
+//   const status = useAuthStore((s) => s.status);
+//   const bootstrap = useAuthStore((s) => s.bootstrap);
+
+//   useEffect(() => {
+//     bootstrap();
+//   }, [bootstrap]);
+
+//   if (status === 'checking') {
+//     return (
+//       <div className="min-h-screen flex items-center justify-center bg-gray-50">
+//         <p className="text-sm text-gray-400">Loading…</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <Routes>
+//       <Route path="/signup" element={<SignUpPage />} />
+//       <Route path="/login" element={<LoginPage />} />
+//       <Route path="/pending-assignment" element={<PendingAssignmentPage />} />
+//       <Route path="/" element={<Navigate to={status === 'authenticated' ? '/pending-assignment' : '/login'} replace />} />
+//     </Routes>
+//   );
+// }
+
 
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router';
-import { SignUpPage } from './pages/SignUpPage';
-import { LoginPage } from './pages/LoginPage';
-import { PendingAssignmentPage } from './pages/PendingAssignmentPage';
+import { Route, Routes } from 'react-router';
+
+import AdminLayout from './components/layout/AdminLayout';
+import DispatcherLayout from './components/layout/DispatcherLayout';
+import DriverLayout from './components/layout/DriverLayout';
+import RequireAuth from './components/routing/RequireAuth';
+import RequireRole from './components/routing/RequireRole';
+import RootRedirect from './components/routing/RootRedirect';
+
+import {LoginPage} from './pages/LoginPage';
+import {PendingAssignmentPage} from './pages/PendingAssignmentPage';
+import {SignUpPage} from './pages/SignUpPage';
+
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminPendingUsersPage from './pages/admin/AdminPendingUsersPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import DispatcherDashboardPage from './pages/dispatcher/DispatcherDashboardPage';
+import DispatcherDriverPage from './pages/dispatcher/DispatcherDriverPage';
+import DriverDashboardPage from './pages/driver/DriverDashboardPage';
+import DriverHoursPage from './pages/driver/DriverHoursPage';
+
 import { useAuthStore } from './store/authStore';
 
-export function App() {
-  const status = useAuthStore((s) => s.status);
+export default function App() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
 
+  // Silent /refresh using the httpOnly cookie, so reloads land already signed in.
   useEffect(() => {
-    bootstrap();
+    void bootstrap();
   }, [bootstrap]);
-
-  if (status === 'checking') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-400">Loading…</p>
-      </div>
-    );
-  }
 
   return (
     <Routes>
-      <Route path="/signup" element={<SignUpPage />} />
+      {/* Public */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/pending-assignment" element={<PendingAssignmentPage />} />
-      <Route path="/" element={<Navigate to={status === 'authenticated' ? '/pending-assignment' : '/login'} replace />} />
+      <Route path="/signup" element={<SignUpPage />} />
+
+      {/* Signed in */}
+      <Route element={<RequireAuth />}>
+        <Route path="/pending-assignment" element={<PendingAssignmentPage />} />
+
+        <Route element={<RequireRole allowed={['admin']} />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="pending" element={<AdminPendingUsersPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireRole allowed={['dispatcher']} />}>
+          <Route path="/dispatcher" element={<DispatcherLayout />}>
+            <Route index element={<DispatcherDashboardPage />} />
+            <Route path="drivers/:driverId" element={<DispatcherDriverPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireRole allowed={['driver']} />}>
+          <Route path="/driver" element={<DriverLayout />}>
+            <Route index element={<DriverDashboardPage />} />
+            <Route path="hours" element={<DriverHoursPage />} />
+          </Route>
+        </Route>
+      </Route>
+
+      {/* "/" and anything unknown -> the right home for this user */}
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   );
 }

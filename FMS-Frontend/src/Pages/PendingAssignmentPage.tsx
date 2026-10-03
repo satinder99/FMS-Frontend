@@ -1,10 +1,24 @@
 // pages/PendingAssignmentPage.tsx
 
+import { Navigate, useNavigate } from 'react-router';
+import { getHomePathForUser } from '../lib/roles';
 import { useAuthStore } from '../store/authStore';
 
 export function PendingAssignmentPage() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  // Once an admin has assigned a role + org, this holding screen is no longer needed.
+  const home = getHomePathForUser(user);
+  if (user && home !== '/pending-assignment') {
+    return <Navigate to={home} replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -14,7 +28,7 @@ export function PendingAssignmentPage() {
           Your account is created, {user?.first_name}. An administrator needs to assign you to an
           organization before you can continue.
         </p>
-        <button onClick={() => logout()} className="text-sm font-medium text-blue-600 hover:underline">
+        <button onClick={handleSignOut} className="text-sm font-medium text-blue-600 hover:underline">
           Sign out
         </button>
       </div>

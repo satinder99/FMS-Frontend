@@ -50,6 +50,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (payload) => {
     const res = await authApi.login(payload);
+    console.log("response from login in store: ",res);
     set({ user: res.user, accessToken: res.accessToken, status: 'authenticated' });
   },
 
