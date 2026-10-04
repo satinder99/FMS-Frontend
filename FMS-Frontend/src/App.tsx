@@ -14,7 +14,9 @@ import { PendingAssignmentPage } from './pages/PendingAssignmentPage';
 import { SignUpPage } from './pages/SignUpPage';
 
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminEditRequestsPage from './pages/admin/AdminEditRequestsPage';
 import AdminNewOrganizationPage from './pages/admin/AdminNewOrganizationPage';
+import AdminOrganizationPage from './pages/admin/AdminOrganizationPage';
 import AdminPendingUsersPage from './pages/admin/AdminPendingUsersPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import DispatcherDashboardPage from './pages/dispatcher/DispatcherDashboardPage';
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="organizations/new" element={<AdminNewOrganizationPage />} />
+            <Route path="organizations/:orgId" element={<AdminOrganizationPage />} />
+            <Route path="edit-requests" element={<AdminEditRequestsPage />} />
             <Route path="pending" element={<AdminPendingUsersPage />} />
             <Route path="users" element={<AdminUsersPage />} />
           </Route>

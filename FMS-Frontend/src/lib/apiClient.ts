@@ -1,3 +1,4 @@
+// [FRONTEND · React] src/lib/apiClient.ts   (YOUR EXISTING FILE: apiUpload and apiDownload were added at the bottom)
 // lib/apiClient.ts — for AUTHENTICATED app endpoints (drivers, orders,
 // documents, etc. — everything behind requireAuth on the backend).
 //
@@ -68,6 +69,63 @@ export async function apiClient<T>(path: string, options: RequestInit = {}, _isR
 
     throw err;
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Files. Same Bearer token and the same one silent refresh as apiClient, but the body is not JSON:
+//  - upload: the browser must set the multipart Content-Type itself (it adds the boundary), so unlike
+//    request() in httpClient we must NOT send "Content-Type: application/json".
+//  - download: the answer is a file, saved through a temporary link.
+// ---------------------------------------------------------------------------------------------------------
+
+async function authedFetch(path: string, init: RequestInit, isRetry = false): Promise<Response> {
+  const { accessToken } = getAuthState();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: 'include',
+      ...init,
+      headers: { ...(init.headers ?? {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    });
+  } catch {
+    // fetch itself failed: no signal, server down, request blocked... (common for a driver on the road)
+    throw new ApiError('Could not reach the server. Check your connection and try again.', 'NETWORK_ERROR', 0);
+  }
+
+  if (res.status === 401 && !isRetry) {
+    const body = (await res.clone().json().catch(() => null)) as { code?: string } | null;
+    if (body?.code === 'ACCESS_TOKEN_EXPIRED') {
+      await refreshAccessToken();
+      return authedFetch(path, init, true);
+    }
+  }
+  return res;
+}
+
+async function failureFrom(res: Response): Promise<ApiError> {
+  const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+  return new ApiError(body?.error ?? 'Request failed', body?.code ?? 'UNKNOWN_ERROR', res.status);
+}
+
+/** POST a multipart form (a file) and read the JSON answer. */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const res = await authedFetch(path, { method: 'POST', body: form });
+  if (!res.ok) throw await failureFrom(res);
+  return (await res.json()) as T;
+}
+
+/** GET a file and save it to the computer under `filename`. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const res = await authedFetch(path, { method: 'GET' });
+  if (!res.ok) throw await failureFrom(res);
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 // Re-exported for convenience so callers don't need two import lines.

@@ -5,7 +5,14 @@ import { ProgressSegments } from '../../components/trips/CheckpointTimeline';
 import { useApiData } from '../../hooks/useApiData';
 import { dispatcherApi } from '../../lib/fleetApi';
 import { timeAgo } from '../../lib/format';
-import { getTripProgress } from '../../lib/tripProgress';
+import { getTripProgress, type TripProgress } from '../../lib/tripProgress';
+
+/** "Loading trailer (in progress)" or "Finished Pick up truck, next: Pick up trailer" */
+function whereNow(p: TripProgress): string {
+  if (!p.current) return 'Trip complete';
+  if (p.current.status === 'in_progress') return `${p.current.label} (in progress)`;
+  return p.lastDone ? `Finished ${p.lastDone.label}, next: ${p.current.label}` : `Not started, first step: ${p.current.label}`;
+}
 
 export default function DispatcherDashboardPage() {
   // Polling every 15s instead of WebSockets: plenty for 10-20 trucks.
@@ -15,7 +22,7 @@ export default function DispatcherDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Drivers & rides</h1>
-        <p className="text-sm text-slate-600">Select a driver to see every checkpoint and when it was completed.</p>
+        <p className="text-sm text-slate-600">Select a driver to see every step with its start and end time.</p>
       </div>
 
       <AsyncState loading={loading} error={error} hasData={!!drivers} onRetry={() => void reload()}>
@@ -66,10 +73,9 @@ export default function DispatcherDashboardPage() {
                             <p className="mt-1.5 text-slate-600">{progress.done} of {progress.total} done</p>
                           </td>
                           <td className="px-4 py-3">
-                            {progress.lastDone ? progress.lastDone.label : 'Not started'}
+                            {whereNow(progress)}
                             <p className="text-slate-500">
                               {progress.lastUpdate ? `Updated ${timeAgo(progress.lastUpdate)}` : 'Waiting on driver'}
-                              {progress.next && ` · next: ${progress.next.label}`}
                             </p>
                           </td>
                         </>

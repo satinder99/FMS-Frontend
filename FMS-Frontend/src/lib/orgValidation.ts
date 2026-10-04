@@ -2,7 +2,16 @@
 // Form rules for onboarding an organization. These MIRROR the backend's
 // Services/organizationService.js (which mirrors the `organizations` table). The backend is the real
 // gatekeeper; this file only lets the admin fix mistakes before submitting. Keep both in sync.
-import type { Country, NewOrganizationPayload, OrgType, SubscriptionPlan } from '../types/admin';
+import type {
+  CheckpointPreset,
+  Country,
+  NewOrganizationPayload,
+  OrgTemplateStep,
+  OrgType,
+  SubscriptionPlan,
+  TemplateStepDraft,
+  TemplateStepPayload,
+} from '../types/admin';
 
 export const ORG_TYPES: { value: OrgType; label: string }[] = [
   { value: 'carrier', label: 'Carrier (runs trucks)' },
@@ -27,7 +36,7 @@ export const TIMEZONES = [
   'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu', 'America/Mexico_City',
 ];
 
-/** Every input is a string while editing. */
+/** Every input is a string while editing, except the list of trip steps. */
 export interface OrgFormValues {
   name: string;
   shortName: string;
@@ -59,6 +68,8 @@ export interface OrgFormValues {
   subscriptionPlan: SubscriptionPlan;
   trialEndsOn: string;
   fleetSize: string;
+  /** The steps every trip of this organization will go through. REQUIRED. */
+  checkpoints: TemplateStepDraft[];
 }
 export type OrgFormErrors = Partial<Record<keyof OrgFormValues, string>>;
 
@@ -69,6 +80,7 @@ export const EMPTY_ORG_FORM: OrgFormValues = {
   addressLine1: '', addressLine2: '', city: '', stateProvince: '', postalCode: '', country: 'US', timezone: 'America/New_York',
   insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiryDate: '', cargoInsuranceAmount: '',
   subscriptionPlan: 'trial', trialEndsOn: '', fleetSize: '',
+  checkpoints: [],
 };
 
 export const slugify = (s: string): string =>
@@ -107,8 +119,83 @@ function normalizeUrl(raw: string, max: number): string | null {
   }
 }
 
+// ---- Trip steps (checkpoints) -------------------------------------------------------------------------
+
+export const MAX_STEPS = 30;
+// 2-60 characters: letters (any language), digits, spaces and . , ' ’ & ( ) / + -   (same rule as the server)
+const STEP_LABEL_RE = /^[\p{L}\p{N}][\p{L}\p{N} .,'’&()/+-]{1,59}$/u;
+
+let draftCounter = 0;
+/** A new, empty row for the step editor. */
+export const newDraft = (partial: Partial<TemplateStepDraft> = {}): TemplateStepDraft => ({
+  id: `step-${++draftCounter}`,
+  choice: '',
+  label: '',
+  crossBorderOnly: false,
+  ...partial,
+});
+
+/** The standard steps, ready to edit (the one-click starting point). */
+export const standardDrafts = (presets: CheckpointPreset[]): TemplateStepDraft[] =>
+  presets.map((p) => newDraft({ choice: p.key, crossBorderOnly: p.crossBorderOnly }));
+
+/** Saved steps -> editor rows. */
+export const stepsToDrafts = (steps: OrgTemplateStep[]): TemplateStepDraft[] =>
+  steps.map((s) =>
+    s.isCustom
+      ? newDraft({ choice: 'other', label: s.label, crossBorderOnly: s.crossBorderOnly })
+      : newDraft({ choice: s.key, crossBorderOnly: s.crossBorderOnly }),
+  );
+
+/** Editor rows -> what the server expects. */
+export const draftsToPayload = (drafts: TemplateStepDraft[]): TemplateStepPayload[] =>
+  drafts.map((d) =>
+    d.choice === 'other'
+      ? { label: d.label.trim().replace(/\s+/g, ' '), crossBorderOnly: d.crossBorderOnly }
+      : { presetKey: d.choice, crossBorderOnly: d.crossBorderOnly },
+  );
+
+/** A message listing everything wrong with the step list, or null when it is fine. */
+export function templateProblems(drafts: TemplateStepDraft[], presets: CheckpointPreset[]): string | null {
+  if (drafts.length === 0) return 'Add at least one step.';
+  if (drafts.length > MAX_STEPS) return `A trip can have at most ${MAX_STEPS} steps.`;
+
+  const problems: string[] = [];
+  const keys = new Set<string>();
+  const labels = new Set<string>();
+  const presetLabels = new Set(presets.map((p) => p.label.toLowerCase()));
+
+  drafts.forEach((d, i) => {
+    const n = i + 1;
+    if (d.choice === '') {
+      problems.push(`Step ${n}: choose a step or type a name for it.`);
+    } else if (d.choice === 'other') {
+      const label = d.label.trim().replace(/\s+/g, ' ');
+      if (!label) return void problems.push(`Step ${n}: choose a step or type a name for it.`);
+      if (!STEP_LABEL_RE.test(label)) {
+        return void problems.push(`Step ${n}: the name must be 2–60 characters (letters, digits, spaces and . , ' & ( ) / + - only).`);
+      }
+      const lower = label.toLowerCase();
+      if (presetLabels.has(lower)) return void problems.push(`Step ${n}: "${label}" is a standard step. Pick it from the list instead of typing it.`);
+      if (labels.has(lower)) return void problems.push(`Step ${n}: "${label}" is already in the list.`);
+      labels.add(lower);
+    } else {
+      const preset = presets.find((p) => p.key === d.choice);
+      if (!preset) return void problems.push(`Step ${n}: choose one of the standard steps, or "Other" to type your own.`);
+      if (keys.has(preset.key)) return void problems.push(`Step ${n}: "${preset.label}" is already in the list.`);
+      keys.add(preset.key);
+      labels.add(preset.label.toLowerCase());
+    }
+  });
+
+  if (!problems.length && drafts.every((d) => d.crossBorderOnly)) {
+    problems.push('At least one step must apply to every trip (not only cross-border trips).');
+  }
+  return problems.length ? problems.join(' ') : null;
+}
+
 /** Returns field -> message, with keys in the same order as the form (so the first one can be focused). */
-export function validateOrgForm(values: OrgFormValues): OrgFormErrors {
+export function validateOrgForm(values: OrgFormValues, presets: CheckpointPreset[]): OrgFormErrors {
   const e: OrgFormErrors = {};
   const t = (k: keyof OrgFormValues) => String(values[k]).trim();
   const maxLen = (k: keyof OrgFormValues, label: string, max: number) => {
@@ -199,12 +286,20 @@ export function validateOrgForm(values: OrgFormValues): OrgFormErrors {
   if (t('fleetSize') && !(/^\d{1,6}$/.test(t('fleetSize')) && Number(t('fleetSize')) <= 100000)) {
     e.fleetSize = 'Fleet size must be a whole number from 0 to 100,000.';
   }
+
+  // --- Trip steps: required
+  const stepProblems = templateProblems(values.checkpoints, presets);
+  if (stepProblems) e.checkpoints = stepProblems;
   return e;
 }
 
 /** Only fields the admin actually filled in are sent; the server applies the same defaults as the table. */
 export function toOrgPayload(values: OrgFormValues): NewOrganizationPayload {
-  const p: NewOrganizationPayload = { name: values.name.trim(), shortName: values.shortName.trim() };
+  const p: NewOrganizationPayload = {
+    name: values.name.trim(),
+    shortName: values.shortName.trim(),
+    checkpoints: draftsToPayload(values.checkpoints),
+  };
   const put = <K extends Exclude<keyof NewOrganizationPayload, 'fleetSize'>>(key: K, raw: string) => {
     const s = raw.trim();
     if (s) Object.assign(p, { [key]: s });

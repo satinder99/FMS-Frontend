@@ -4,6 +4,9 @@
 // a column of the `organizations` table. Rules live in lib/orgValidation.ts (mirrors the backend).
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import AsyncState from '../../components/common/AsyncState';
+import CheckpointTemplateEditor from '../../components/admin/CheckpointTemplateEditor';
+import { useApiData } from '../../hooks/useApiData';
 import { adminApi, errorMessage } from '../../lib/fleetApi';
 import { ApiError } from '../../lib/httpClient';
 import {
@@ -22,6 +25,9 @@ import type { CreatedOrganization } from '../../types/admin';
 
 const inputClass =
   'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 aria-[invalid=true]:border-red-500';
+
+// The fields a plain text box / drop-down can show. The trip-step list is not one of them: it has its own editor.
+type TextKey = Exclude<keyof OrgFormValues, 'checkpoints'>;
 
 // When the server rejects a value that is already taken, point at that exact field.
 const FIELD_FOR_CONFLICT: Record<string, keyof OrgFormValues> = {
@@ -62,6 +68,8 @@ function Field({
 }
 
 export default function AdminNewOrganizationPage() {
+  // The standard steps for the drop-down come from the server, so there is one list to maintain.
+  const presetsQ = useApiData(adminApi.checkpointPresets);
   const [values, setValues] = useState<OrgFormValues>(EMPTY_ORG_FORM);
   const [errors, setErrors] = useState<OrgFormErrors>({});
   const [slugEdited, setSlugEdited] = useState(false);
@@ -80,7 +88,7 @@ export default function AdminNewOrganizationPage() {
   }
 
   // Props shared by every text-like input: id, value, change handler and accessibility links to the hint/error.
-  const bind = (key: keyof OrgFormValues) => ({
+  const bind = (key: TextKey) => ({
     id: `org-${key}`,
     value: values[key],
     'aria-invalid': errors[key] ? true : undefined,
@@ -96,7 +104,7 @@ export default function AdminNewOrganizationPage() {
     e.preventDefault();
     setBanner(null);
 
-    const found = validateOrgForm(values);
+    const found = validateOrgForm(values, presetsQ.data ?? []);
     setErrors(found);
     const first = Object.keys(found)[0];
     if (first) {
@@ -107,8 +115,6 @@ export default function AdminNewOrganizationPage() {
 
     setSaving(true);
     try {
-      console.log(values);
-      
       setCreated(await adminApi.createOrganization(toOrgPayload(values)));
     } catch (err) {
       const field = err instanceof ApiError ? FIELD_FOR_CONFLICT[err.code] : undefined;
@@ -142,6 +148,7 @@ export default function AdminNewOrganizationPage() {
             <div><dt className="text-slate-600">URL name</dt><dd className="font-medium">{created.slug}</dd></div>
             <div><dt className="text-slate-600">Type</dt><dd className="font-medium capitalize">{created.orgType}</dd></div>
             <div><dt className="text-slate-600">Plan</dt><dd className="font-medium capitalize">{created.subscriptionPlan}</dd></div>
+            <div><dt className="text-slate-600">Trip steps</dt><dd className="font-medium">{created.stepCount}</dd></div>
             <div><dt className="text-slate-600">Timezone</dt><dd className="font-medium">{created.timezone}</dd></div>
             {created.trialEndsAt && (
               <div>
@@ -308,10 +315,25 @@ export default function AdminNewOrganizationPage() {
           )}
         </Section>
 
+        <fieldset className="rounded-xl border border-slate-200 bg-white p-5">
+          <legend className="px-1 text-base font-semibold">
+            Trip steps <span className="text-sm font-semibold text-red-700">(required)</span>
+          </legend>
+          <AsyncState loading={presetsQ.loading} error={presetsQ.error} hasData={!!presetsQ.data} onRetry={() => void presetsQ.reload()}>
+            <CheckpointTemplateEditor
+              presets={presetsQ.data ?? []}
+              value={values.checkpoints}
+              onChange={(next) => setField('checkpoints', next)}
+              idPrefix="org-checkpoints"
+              error={errors.checkpoints}
+            />
+          </AsyncState>
+        </fieldset>
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !presetsQ.data}
             className="rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
           >
             {saving ? 'Creating…' : 'Create organization'}

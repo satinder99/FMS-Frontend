@@ -1,10 +1,14 @@
 // [FRONTEND · React] src/pages/driver/DriverDashboardPage.tsx
-import { useState } from 'react';
+// The driver's trips. The current ride is shown ONE STEP PER PAGE (DriverCheckpointStepper). Finished
+// trips can be expanded to see every step's start and end time.
 import AsyncState from '../../components/common/AsyncState';
-import CheckpointTimeline, { ProgressSegments } from '../../components/trips/CheckpointTimeline';
+import CheckpointTimeline from '../../components/trips/CheckpointTimeline';
+import DriverCheckpointStepper from '../../components/trips/DriverCheckpointStepper';
+import DriverStepActions from '../../components/trips/DriverStepActions';
+import StepDocuments from '../../components/trips/StepDocuments';
 import TripMeta from '../../components/trips/TripMeta';
 import { useApiData } from '../../hooks/useApiData';
-import { driverApi, errorMessage } from '../../lib/fleetApi';
+import { driverApi } from '../../lib/fleetApi';
 import { formatDateTime } from '../../lib/format';
 import { getTripProgress } from '../../lib/tripProgress';
 import { useAuthStore } from '../../store/authStore';
@@ -12,28 +16,11 @@ import { useAuthStore } from '../../store/authStore';
 export default function DriverDashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { data, error, loading, reload } = useApiData(driverApi.listTrips, 30_000);
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const trips = data ?? [];
-  const active =
-    trips.find((t) => getTripProgress(t).status === 'in_progress') ??
-    trips.find((t) => getTripProgress(t).status === 'assigned');
-  const upcoming = trips.filter((t) => t.id !== active?.id && getTripProgress(t).status !== 'completed');
-  const completed = trips.filter((t) => getTripProgress(t).status === 'completed');
-
-  async function handleComplete(tripId: number) {
-    setBusy(true);
-    setActionError(null);
-    try {
-      await driverApi.completeNextCheckpoint(tripId);
-      await reload();
-    } catch (err) {
-      setActionError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const active = trips.find((t) => t.status === 'in_progress') ?? trips.find((t) => t.status === 'assigned');
+  const upcoming = trips.filter((t) => t.id !== active?.id && t.status !== 'completed');
+  const completed = trips.filter((t) => t.status === 'completed');
 
   return (
     <div className="space-y-8">
@@ -42,7 +29,7 @@ export default function DriverDashboardPage() {
       <AsyncState loading={loading} error={error} hasData={!!data} onRetry={() => void reload()}>
         {!active ? (
           <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
-            No trips assigned to you yet. Your dispatcher will assign one soon.
+            No trips assigned to you right now. Your dispatcher will assign one soon.
           </p>
         ) : (
           <section aria-labelledby="current-ride" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -52,29 +39,10 @@ export default function DriverDashboardPage() {
               </h2>
               <p className="text-sm text-slate-500">Pickup {formatDateTime(active.scheduledPickup)}</p>
             </div>
-
             <TripMeta trip={active} />
             <hr className="my-5 border-slate-200" />
-
-            {actionError && (
-              <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
-                {actionError}
-              </p>
-            )}
-
-            <CheckpointTimeline
-              trip={active}
-              action={
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleComplete(active.id)}
-                  className="rounded-md bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-300 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
-                >
-                  {busy ? 'Saving…' : `Mark “${getTripProgress(active).next?.label}” done`}
-                </button>
-              }
-            />
+            {/* key: start from the right step whenever the trip changes */}
+            <DriverCheckpointStepper key={active.id} trip={active} onChanged={reload} />
           </section>
         )}
 
@@ -83,7 +51,7 @@ export default function DriverDashboardPage() {
             <h2 id="upcoming" className="mb-3 text-lg font-semibold">Upcoming trips</h2>
             <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
               {upcoming.map((trip) => (
-                <li key={trip.id} className="space-y-3 p-4">
+                <li key={trip.id} className="space-y-1 p-4">
                   <div className="flex flex-wrap justify-between gap-2">
                     <p className="font-medium">
                       {trip.origin} <span className="text-slate-400">to</span> {trip.destination}
@@ -92,9 +60,8 @@ export default function DriverDashboardPage() {
                   </div>
                   <p className="text-sm text-slate-600">
                     Truck <span className="tabular-nums">{trip.truckNumber}</span> · Trailer{' '}
-                    <span className="tabular-nums">{trip.trailerNumber}</span>
+                    <span className="tabular-nums">{trip.trailerNumber}</span> · {trip.checkpoints.length} steps
                   </p>
-                  <ProgressSegments trip={trip} />
                 </li>
               ))}
             </ul>
@@ -103,17 +70,38 @@ export default function DriverDashboardPage() {
 
         {completed.length > 0 && (
           <section aria-labelledby="completed" className="mt-8">
-            <h2 id="completed" className="mb-3 text-lg font-semibold">Completed (last 30 days)</h2>
-            <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white text-sm">
-              {completed.map((trip) => (
-                <li key={trip.id} className="flex flex-wrap justify-between gap-2 p-4">
-                  <span>{trip.origin} to {trip.destination}</span>
-                  <span className="text-slate-500">
-                    Delivered {formatDateTime(getTripProgress(trip).lastUpdate)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <h2 id="completed" className="mb-1 text-lg font-semibold">Completed trips (last 30 days)</h2>
+            <p className="mb-3 text-sm text-slate-600">Select a trip to see when each step started and ended.</p>
+            <div className="space-y-3">
+              {completed.map((trip) => {
+                const p = getTripProgress(trip);
+                return (
+                  <details key={trip.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="font-medium">
+                          {trip.reference} · {trip.origin} <span className="text-slate-400">to</span> {trip.destination}
+                        </span>
+                        <span className="text-sm text-slate-500">Delivered {formatDateTime(p.lastDone?.completedAt ?? null)}</span>
+                      </div>
+                    </summary>
+                    <div className="mt-5 space-y-5">
+                      <TripMeta trip={trip} />
+                      {/* a step recorded in the last 30 minutes can still be undone or corrected from here */}
+                      <CheckpointTimeline
+                        trip={trip}
+                        renderActions={(cp) => (
+                          <div className="space-y-2">
+                            <StepDocuments trip={trip} cp={cp} canDownload={false} />
+                            <DriverStepActions trip={trip} cp={cp} onChanged={reload} showLockedNote={false} />
+                          </div>
+                        )}
+                      />
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
           </section>
         )}
       </AsyncState>

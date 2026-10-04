@@ -1,3 +1,4 @@
+// [FRONTEND · React] src/components/layout/AppShell.tsx   (YOUR EXISTING FILE: only the optional `badge` on nav links was added)
 import { NavLink, Outlet } from 'react-router';
 import { useAuthStore } from '../../store/authStore';
 
@@ -5,6 +6,8 @@ export interface NavItem {
   to: string;
   label: string;
   end?: boolean;
+  /** Small count shown next to the label (e.g. pending requests). Hidden when 0. */
+  badge?: number;
 }
 
 interface Props {
@@ -38,6 +41,12 @@ export default function AppShell({ portalName, nav }: Props) {
                 }
               >
                 {item.label}
+                {item.badge ? (
+                  <span className="ml-2 rounded-full bg-amber-400 px-1.5 py-0.5 text-xs font-semibold text-slate-900">
+                    {item.badge}
+                    <span className="sr-only"> waiting</span>
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           </nav>
