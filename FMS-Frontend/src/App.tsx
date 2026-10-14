@@ -19,11 +19,13 @@ import AdminNewOrganizationPage from './pages/admin/AdminNewOrganizationPage';
 import AdminOrganizationPage from './pages/admin/AdminOrganizationPage';
 import AdminPendingUsersPage from './pages/admin/AdminPendingUsersPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import ActiveRidesPage from './pages/dispatcher/ActiveRidesPage';
 import DispatcherDashboardPage from './pages/dispatcher/DispatcherDashboardPage';
 import DispatcherDriverPage from './pages/dispatcher/DispatcherDriverPage';
 import DriverPayRatesPage from './pages/dispatcher/DriverPayRatesPage';
 import EquipmentPage from './pages/dispatcher/EquipmentPage';
 import NewTripPage from './pages/dispatcher/NewTripPage';
+import RideDetailPage from './pages/dispatcher/RideDetailPage';
 import DriverDashboardPage from './pages/driver/DriverDashboardPage';
 import DriverHoursPage from './pages/driver/DriverHoursPage';
 
@@ -63,6 +65,8 @@ export default function App() {
             <Route index element={<DispatcherDashboardPage />} />
             <Route path="drivers/:driverId" element={<DispatcherDriverPage />} />
             <Route path="drivers/:driverId/pay" element={<DriverPayRatesPage />} />
+            <Route path="rides" element={<ActiveRidesPage />} />
+            <Route path="rides/:tripId" element={<RideDetailPage />} />
             <Route path="trips/new" element={<NewTripPage />} />
             <Route path="equipment" element={<EquipmentPage />} />
           </Route>

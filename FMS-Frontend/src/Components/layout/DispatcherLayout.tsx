@@ -5,9 +5,11 @@ export default function DispatcherLayout() {
   return (
     <AppShell
       portalName="Dispatch"
+      withPresence
       nav={[
         { to: '/dispatcher', label: 'Drivers & rides', end: true },
-        { to: '/dispatcher/trips/new', label: 'New trip' },
+        { to: '/dispatcher/rides', label: 'Active rides' },
+        { to: '/dispatcher/trips/new', label: 'New order' },
         { to: '/dispatcher/equipment', label: 'Trucks & trailers' },
       ]}
     />

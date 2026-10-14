@@ -1,3 +1,5 @@
+// [FRONTEND · React] src/components/trips/TripMeta.tsx   (YOUR EXISTING FILE: + a small Outbound/Inbound label)
+import { DIRECTION_LABEL, DIRECTION_ROUTE } from '../../lib/rides';
 import type { Trip } from '../../types/trips';
 
 /** Route + truck + trailer facts for a trip. */
@@ -8,6 +10,9 @@ export default function TripMeta({ trip }: { trip: Trip }) {
         <dt className="text-slate-500">Route</dt>
         <dd className="font-medium">
           {trip.origin} <span className="text-slate-400">to</span> {trip.destination}
+          <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+            {DIRECTION_LABEL[trip.direction]} · {DIRECTION_ROUTE[trip.direction]}
+          </span>
           {trip.crossBorder && (
             <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-800">
               Cross-border

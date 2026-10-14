@@ -1,6 +1,7 @@
 // [FRONTEND · React] src/pages/admin/AdminPendingUsersPage.tsx
 import AssignRoleForm from '../../components/admin/AssignRoleForm';
 import AsyncState from '../../components/common/AsyncState';
+import Avatar from '../../components/common/Avatar';
 import { useApiData } from '../../hooks/useApiData';
 import { formatDateTime } from '../../lib/format';
 import { adminApi } from '../../lib/fleetApi';
@@ -44,10 +45,13 @@ export default function AdminPendingUsersPage() {
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
             {pending.map((u) => (
               <li key={u.id} className="flex flex-wrap items-start justify-between gap-4 p-4">
-                <div>
-                  <p className="font-medium">{u.first_name} {u.last_name}</p>
-                  <p className="text-sm text-slate-600">{u.email}</p>
-                  <p className="text-sm text-slate-500">Signed up {formatDateTime(u.created_at)}</p>
+                <div className="flex items-start gap-3">
+                  <Avatar firstName={u.first_name} lastName={u.last_name} photoUrl={u.photo_url} size="lg" />
+                  <div>
+                    <p className="font-medium">{u.first_name} {u.last_name}</p>
+                    <p className="text-sm text-slate-600">{u.email}</p>
+                    <p className="text-sm text-slate-500">Signed up {formatDateTime(u.created_at)}</p>
+                  </div>
                 </div>
                 <AssignRoleForm user={u} orgs={orgsQ.data ?? []} submitLabel="Grant access" onAssign={handleAssign} />
               </li>

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import AssignRoleForm from '../../components/admin/AssignRoleForm';
 import AsyncState from '../../components/common/AsyncState';
+import Avatar from '../../components/common/Avatar';
 import { useApiData } from '../../hooks/useApiData';
 import { adminApi } from '../../lib/fleetApi';
 import { isAssigned } from '../../lib/roles';
@@ -94,8 +95,13 @@ export default function AdminUsersPage() {
               {filtered.map((u) => (
                 <tr key={u.id} className="align-top">
                   <td className="px-4 py-3">
-                    <p className="font-medium">{u.first_name} {u.last_name}</p>
-                    <p className="text-slate-500">{u.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar firstName={u.first_name} lastName={u.last_name} photoUrl={u.photo_url} />
+                      <div>
+                        <p className="font-medium">{u.first_name} {u.last_name}</p>
+                        <p className="text-slate-500">{u.email}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {u.username ?? <span className="text-slate-400">not generated</span>}

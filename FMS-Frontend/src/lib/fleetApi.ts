@@ -20,6 +20,7 @@ import type {
 } from '../types/admin';
 import type { RoleName } from '../types/roles';
 import type {
+  ActiveOrder,
   DispatcherDriverDetail,
   DispatcherDriverRow,
   DriverSummary,
@@ -31,8 +32,11 @@ import type {
   NewEquipmentPayload,
   NewPayRatePayload,
   NewEditRequestPayload,
+  NewOrderPayload,
   NewTripPayload,
   PayRate,
+  PresenceSnapshot,
+  RideDetail,
   StepTimesPayload,
   Trip,
   TripDocument,
@@ -106,6 +110,11 @@ export const driverApi = {
     return apiUpload<{ trip: Trip }>(`/api/driver/trips/${tripId}/documents`, form).then((r) => r.trip);
   },
   deleteDocument: (docId: number) => send<{ trip: Trip }>('DELETE', `/api/driver/documents/${docId}`).then((r) => r.trip),
+
+  // A new order: the driver answers first. Steps appear only after Accept; Deny removes the ride.
+  acceptOrder: (orderId: number) => send<{ response: 'accepted' }>('POST', `/api/driver/orders/${orderId}/accept`),
+  denyOrder: (orderId: number, reason?: string) =>
+    send<{ response: 'denied' }>('POST', `/api/driver/orders/${orderId}/deny`, { reason }),
 };
 
 export const dispatcherApi = {
@@ -114,6 +123,15 @@ export const dispatcherApi = {
   getResources: () => get<TripResources>('/api/dispatcher/resources'),
   createTrip: (payload: NewTripPayload) =>
     send<{ trip: Trip }>('POST', '/api/dispatcher/trips', payload).then((r) => r.trip),
+  // One order = one driver/truck/trailer + an outbound ride, an inbound ride, or both
+  createOrder: (payload: NewOrderPayload) =>
+    send<{ trips: Trip[] }>('POST', '/api/dispatcher/orders', payload).then((r) => r.trips),
+
+  // Active rides board, one ride's detail, and cancelling one leg (outbound or inbound) on its own
+  listRides: () => get<{ orders: ActiveOrder[] }>('/api/dispatcher/rides').then((r) => r.orders),
+  getRide: (tripId: number) => get<RideDetail>(`/api/dispatcher/rides/${tripId}`),
+  cancelRide: (tripId: number, reason?: string) =>
+    send<{ trip: Trip }>('POST', `/api/dispatcher/rides/${tripId}/cancel`, { reason }).then((r) => r.trip),
 
   // Downloads: one file, or every document of a trip as a single ZIP
   downloadDocument: (doc: TripDocument) => apiDownload(`/api/dispatcher/documents/${doc.id}/download`, doc.downloadName),
@@ -142,6 +160,12 @@ export const dispatcherApi = {
     get<{ driver: DriverSummary; rates: PayRate[] }>(`/api/dispatcher/drivers/${driverId}/pay-rates`),
   addPayRate: (driverId: number, payload: NewPayRatePayload) =>
     send<{ rate: PayRate }>('POST', `/api/dispatcher/drivers/${driverId}/pay-rates`, payload).then((r) => r.rate),
+};
+
+// Online-now row (dispatchers and drivers). The GET is also the heartbeat.
+export const presenceApi = {
+  heartbeat: () => get<PresenceSnapshot>('/api/presence'),
+  leave: () => send<{ ok: true }>('DELETE', '/api/presence'),
 };
 
 export const errorMessage = (err: unknown): string =>

@@ -3,14 +3,16 @@
 // each expandable to see every step's start and end time.
 import { useCallback } from 'react';
 import AsyncState from '../common/AsyncState';
+import Avatar from '../common/Avatar';
 import CheckpointTimeline, { ProgressSegments } from '../trips/CheckpointTimeline';
 import TripMeta from '../trips/TripMeta';
 import { useApiData } from '../../hooks/useApiData';
 import { adminApi } from '../../lib/fleetApi';
 import { formatDateTime } from '../../lib/format';
+import { DIRECTION_LABEL } from '../../lib/rides';
 import { getTripProgress } from '../../lib/tripProgress';
 
-const STATUS_LABEL = { assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed' } as const;
+const STATUS_LABEL = { assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' } as const;
 
 export default function OrgUserTrips({ orgId, userId }: { orgId: number; userId: number }) {
   const fetcher = useCallback(() => adminApi.userTrips(orgId, userId), [orgId, userId]);
@@ -38,8 +40,19 @@ export default function OrgUserTrips({ orgId, userId }: { orgId: number; userId:
                         {STATUS_LABEL[trip.status]} · {p.done}/{p.total} steps · pickup {formatDateTime(trip.scheduledPickup)}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600">
-                      {isDispatcher ? `Driver: ${trip.driverName}` : `Created by: ${trip.createdByName ?? 'unknown'}`}
+                    <p className="flex items-center gap-2 text-sm text-slate-600">
+                      {isDispatcher ? (
+                        <>
+                          <Avatar name={trip.driverName} photoUrl={trip.driverPhotoUrl} size="sm" />
+                          Driver: {trip.driverName}
+                        </>
+                      ) : (
+                        <>
+                          <Avatar name={trip.createdByName} size="sm" />
+                          Created by: {trip.createdByName ?? 'unknown'}
+                        </>
+                      )}
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{DIRECTION_LABEL[trip.direction]}</span>
                     </p>
                     <div className="mt-2"><ProgressSegments trip={trip} /></div>
                   </summary>

@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import AsyncState from '../../components/common/AsyncState';
+import Avatar from '../../components/common/Avatar';
 import OrgCheckpointsPanel from '../../components/admin/OrgCheckpointsPanel';
 import OrgUserTrips from '../../components/admin/OrgUserTrips';
 import { useApiData } from '../../hooks/useApiData';
@@ -101,8 +102,13 @@ export default function AdminOrganizationPage() {
                     <Fragment key={u.id}>
                       <tr className="align-top">
                         <td className="px-4 py-3">
-                          <p className="font-medium">{u.name}</p>
-                          <p className="text-slate-500">{u.email}</p>
+                          <div className="flex items-center gap-3">
+                            <Avatar name={u.name} photoUrl={u.photoUrl} />
+                            <div>
+                              <p className="font-medium">{u.name}</p>
+                              <p className="text-slate-500">{u.email}</p>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 capitalize">{u.role}</td>
                         <td className="px-4 py-3">{u.status}</td>

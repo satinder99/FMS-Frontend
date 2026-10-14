@@ -3,6 +3,7 @@
 // organization (30 min / 1 h / 2 h / 3 h / 4 h); the window can be ended early.
 import { useState } from 'react';
 import AsyncState from '../../components/common/AsyncState';
+import Avatar from '../../components/common/Avatar';
 import { useApiData } from '../../hooks/useApiData';
 import { adminApi, errorMessage } from '../../lib/fleetApi';
 import { formatDateTime, formatMinutesLeft } from '../../lib/format';
@@ -42,8 +43,11 @@ function PendingRow({ request, onDecided }: { request: AdminEditRequest; onDecid
   return (
     <li className="space-y-3 p-4">
       <div>
-        <p className="font-medium">
-          {request.orgName} <span className="font-normal text-slate-500">· asked by {request.requestedByName ?? 'a dispatcher'} on {formatDateTime(request.createdAt)}</span>
+        <p className="flex flex-wrap items-center gap-2 font-medium">
+          {request.orgName}
+          <span className="flex items-center gap-2 font-normal text-slate-500">
+            · <Avatar name={request.requestedByName} size="sm" /> asked by {request.requestedByName ?? 'a dispatcher'} on {formatDateTime(request.createdAt)}
+          </span>
         </p>
         {request.tripReference && (
           <p className="text-sm text-slate-600">About {request.tripReference} · {request.checkpointLabel}</p>
@@ -193,7 +197,11 @@ export default function AdminEditRequestsPage() {
                   {(historyQ.data ?? []).map((r) => (
                     <tr key={r.id} className="align-top">
                       <td className="px-4 py-3">{r.orgName}</td>
-                      <td className="px-4 py-3">{r.requestedByName ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {r.requestedByName ? (
+                          <span className="flex items-center gap-2"><Avatar name={r.requestedByName} size="sm" />{r.requestedByName}</span>
+                        ) : '—'}
+                      </td>
                       <td className="px-4 py-3 max-w-xs">{r.reason}</td>
                       <td className="px-4 py-3">
                         {OUTCOME[r.status]}

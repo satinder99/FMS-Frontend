@@ -5,11 +5,13 @@ import AsyncState from '../../components/common/AsyncState';
 import CheckpointTimeline from '../../components/trips/CheckpointTimeline';
 import DriverCheckpointStepper from '../../components/trips/DriverCheckpointStepper';
 import DriverStepActions from '../../components/trips/DriverStepActions';
+import OrderResponseCard from '../../components/trips/OrderResponseCard';
 import StepDocuments from '../../components/trips/StepDocuments';
 import TripMeta from '../../components/trips/TripMeta';
 import { useApiData } from '../../hooks/useApiData';
 import { driverApi } from '../../lib/fleetApi';
 import { formatDateTime } from '../../lib/format';
+import { DIRECTION_LABEL } from '../../lib/rides';
 import { getTripProgress } from '../../lib/tripProgress';
 import { useAuthStore } from '../../store/authStore';
 
@@ -17,7 +19,11 @@ export default function DriverDashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { data, error, loading, reload } = useApiData(driverApi.listTrips, 30_000);
 
-  const trips = data ?? [];
+  const all = data ?? [];
+  // Orders the driver has not answered yet: shown as a small card with Accept / Deny, grouped per order, no steps.
+  const unanswered = all.filter((t) => t.acceptance === 'pending');
+  const pendingOrders = [...new Set(unanswered.map((t) => t.orderId))].map((id) => unanswered.filter((t) => t.orderId === id));
+  const trips = all.filter((t) => t.acceptance !== 'pending');
   const active = trips.find((t) => t.status === 'in_progress') ?? trips.find((t) => t.status === 'assigned');
   const upcoming = trips.filter((t) => t.id !== active?.id && t.status !== 'completed');
   const completed = trips.filter((t) => t.status === 'completed');
@@ -27,8 +33,12 @@ export default function DriverDashboardPage() {
       <h1 className="text-2xl font-semibold tracking-tight">{user ? `Hi ${user.first_name}` : 'My trips'}</h1>
 
       <AsyncState loading={loading} error={error} hasData={!!data} onRetry={() => void reload()}>
+        {pendingOrders.map((order) => (
+          <OrderResponseCard key={order[0].orderId} trips={order} onAnswered={reload} />
+        ))}
+
         {!active ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+          pendingOrders.length === 0 && <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
             No trips assigned to you right now. Your dispatcher will assign one soon.
           </p>
         ) : (
@@ -55,6 +65,9 @@ export default function DriverDashboardPage() {
                   <div className="flex flex-wrap justify-between gap-2">
                     <p className="font-medium">
                       {trip.origin} <span className="text-slate-400">to</span> {trip.destination}
+                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+                        {DIRECTION_LABEL[trip.direction]}
+                      </span>
                     </p>
                     <p className="text-sm text-slate-500">Pickup {formatDateTime(trip.scheduledPickup)}</p>
                   </div>

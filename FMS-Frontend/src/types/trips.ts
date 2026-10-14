@@ -32,7 +32,23 @@ export interface Checkpoint {
   driverEditableSeconds: number | null;
 }
 
-export type TripStatus = 'assigned' | 'in_progress' | 'completed';
+export type TripStatus = 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+
+/** outbound = Canada -> US, inbound = US -> Canada. Each is its own ride (a "leg") of one order. */
+export type Direction = 'outbound' | 'inbound';
+
+/** The driver's answer to an order. Steps are hidden from the driver while it is 'pending'. */
+export type Acceptance = 'pending' | 'accepted' | 'denied';
+
+/** P = Pick-up, B = Border, D = Delivered. disabled = this ride has no such stage (e.g. no border). */
+export type StageState = 'completed' | 'pending' | 'disabled';
+export interface TripStages {
+  P: StageState;
+  B: StageState;
+  D: StageState;
+  /** The stage being worked on now (first one not finished); null when all are done */
+  current: 'P' | 'B' | 'D' | null;
+}
 
 export type DocumentType = 'pod' | 'bol' | 'itinerary' | 'immigration' | 'other';
 
@@ -57,6 +73,17 @@ export interface Trip {
   reference: string;
   driverId: number;
   driverName: string;
+  driverPhotoUrl: string | null;
+  /** The order this ride belongs to (an order has an outbound and/or an inbound ride) */
+  orderId: number;
+  orderReference: string;
+  direction: Direction;
+  acceptance: Acceptance;
+  denyReason: string | null;
+  respondedAt: string | null;
+  cancelledAt: string | null;
+  cancelledByRole: 'dispatcher' | 'driver' | null;
+  cancelReason: string | null;
   /** The dispatcher who created the trip */
   createdByName: string | null;
   truckNumber: string;
@@ -68,7 +95,57 @@ export interface Trip {
   status: TripStatus;
   /** Ordered. The immigration checkpoint only exists when crossBorder is true. */
   checkpoints: Checkpoint[];
+  stages: TripStages;
   documents: TripDocument[];
+}
+
+/** One order on the dispatcher's "Active rides" board: one truck, up to two rides. */
+export interface ActiveOrder {
+  orderId: number;
+  reference: string;
+  response: Acceptance;
+  denyReason: string | null;
+  respondedAt: string | null;
+  driver: { id: number; name: string; photoUrl: string | null };
+  truckNumber: string;
+  trailerNumber: string;
+  /** moving = a ride is in progress, waiting = accepted and about to start, awaiting_driver = not answered yet */
+  truckState: 'moving' | 'waiting' | 'awaiting_driver' | 'idle';
+  outbound: Trip | null;
+  inbound: Trip | null;
+}
+
+export interface RideDetail {
+  trip: Trip;
+  legs: { id: number; direction: Direction; status: TripStatus; reference: string }[];
+  editAccess: EditAccessState;
+}
+
+export interface NewLegPayload {
+  direction: Direction;
+  origin: string;
+  destination: string;
+  scheduledPickup: string; // ISO
+  crossBorder: boolean;
+}
+
+export interface NewOrderPayload {
+  driverId: number;
+  truckId: number;
+  trailerId: number;
+  legs: NewLegPayload[];
+}
+
+export interface OnlineDispatcher {
+  id: number;
+  firstName: string;
+  lastName: string;
+  isMe: boolean;
+}
+
+export interface PresenceSnapshot {
+  organization: { id: number; name: string } | null;
+  onlineDispatchers: OnlineDispatcher[];
 }
 
 export interface DriverSummary {

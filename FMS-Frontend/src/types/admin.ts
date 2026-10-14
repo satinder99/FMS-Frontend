@@ -19,6 +19,8 @@ export interface AdminUser {
   role_name: RoleName | null;
   status: string;
   created_at: string;
+  /** The driver's profile photo (https address) or null: show the initials icon instead */
+  photo_url: string | null;
 }
 
 // ---- Onboarding a new organization (columns of the `organizations` table) ----
@@ -101,6 +103,8 @@ export interface OrgOverview {
 export interface OrgUser {
   id: number;
   name: string;
+  /** Driver profile photo (https address) or null: show the initials icon instead */
+  photoUrl: string | null;
   email: string;
   username: string | null;
   status: string;
